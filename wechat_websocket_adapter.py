@@ -51,10 +51,17 @@ class WechatWebsocketMessageType(Enum):
     CHAOS_TYPE = 49
 
 # TODO: 完善代码
-@register_platform_adapter("wechat-websocket", "wechat-websocket 适配器", default_config_tmpl={
-    "host": "your_token",
-    "port": "5555",
-})
+@register_platform_adapter(
+    adapter_name="wechat-websocket",
+    adapter_display_name="微信个人hook",
+    desc="微信个人hook",
+    default_config_tmpl={
+        "host": "your_token",
+        "port": "5555",
+    },
+    logo_path="assets/wechat-6a207b66.png",
+    support_streaming_message=False,
+)
 class WeChatWebsocketAdapter(Platform):
 
     def __init__(
