@@ -56,7 +56,7 @@ class WechatWebsocketMessageType(Enum):
     adapter_display_name="微信个人hook",
     desc="微信个人hook",
     default_config_tmpl={
-        "host": "your_token",
+        "host": "目标IP",
         "port": "5555",
     },
     logo_path="assets/wechat-6a207b66.png",
