@@ -34,6 +34,7 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                 await asyncio.sleep(1)
                 if isinstance(comp, Plain):
                     await self._send_text(session, comp.text)
+        await super().send(message)
 
     async def _send_text(self, session: aiohttp.ClientSession, text: str):
         payload = {
