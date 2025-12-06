@@ -430,7 +430,8 @@ class WeChatWebsocketAdapter(Platform):
             logger.error(f"缓存文本消息失败: {e}")
 
     async def _process_chaos(self, abm: AstrBotMessage, raw_message: dict):
-        # todo 处理被引用的消息
+        # todo 处理被引用的消息 @see astrbot.core.message.components.Reply，以及转发消息 astrbot.core.message.components.Forward
+        # todo 处理 @所有人消息 @see astrbot.core.message.components.AtAll
         chaos_xml = raw_message.get("content").get("content")
         xml_data = etree.fromstring(chaos_xml)
         xml_type_list = xml_data.xpath("/msg/appmsg/type")
