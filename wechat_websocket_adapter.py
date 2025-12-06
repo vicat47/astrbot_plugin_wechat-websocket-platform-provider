@@ -240,6 +240,8 @@ class WeChatWebsocketAdapter(Platform):
                     )
                     # 提交事件到事件队列
                     self.commit_event(message_event)
+            elif int(message_data.get("type")) == WechatWebsocketMessageType.HEART_BEAT:
+                logger.debug(f"收到心跳消息")
             else:
                 logger.warning(f"收到未知结构的 WebSocket 消息: {message_data}")
         except json.JSONDecodeError:
@@ -249,7 +251,7 @@ class WeChatWebsocketAdapter(Platform):
         pass
 
     async def convert_message(self, raw_message: dict) -> AstrBotMessage | None:
-        """将 WeChatPadPro 原始消息转换为 AstrBotMessage。"""
+        """将 WeChat-Websocket 原始消息转换为 AstrBotMessage。"""
         abm = AstrBotMessage()
         abm.raw_message = raw_message
         abm.message_id = str(raw_message.get("id"))
