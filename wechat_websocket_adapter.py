@@ -6,7 +6,6 @@ import time
 import traceback
 from asyncio import Queue
 from datetime import datetime
-from enum import Enum
 from typing import List
 from xml.etree.ElementTree import Element
 
@@ -20,35 +19,11 @@ from astrbot.core.platform import PlatformMetadata, AstrBotMessage, MessageType,
     Platform
 from astrbot.core.platform.message_session import MessageSesion
 from astrbot.core.platform.register import register_platform_adapter
-from astrbot.core.star import Star
 from astrbot.core.star.context import logger
 
-from .wechat_websocket_message_event import WeChatWebsocketMessageEvent
+from .wechat_income_msg import WechatWebsocketMessageType, BaseWechatMessage, TextMessage  # noqa
+from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
 
-
-class WechatWebsocketMessageType(Enum):
-    HEART_BEAT = 5005
-    RECV_TXT_MSG = 1
-    RECV_PIC_MSG = 3
-    USER_LIST = 5000
-    GET_USER_LIST_SUCCSESS = 5001
-    GET_USER_LIST_FAIL = 5002
-    TXT_MSG = 555
-    PIC_MSG = 500
-    AT_MSG = 550
-    CHATROOM_MEMBER = 5010
-    CHATROOM_MEMBER_NICK = 5020
-    PERSONAL_INFO = 6500
-    DEBUG_SWITCH = 6000
-    PERSONAL_DETAIL = 6550
-    DESTROY_ALL = 9999
-    # 微信好友请求消息
-    NEW_FRIEND_REQUEST = 37
-    # 同意微信好友请求消息
-    AGREE_TO_FRIEND_REQUEST = 10000
-    ATTATCH_FILE = 5003
-    # 啥都有，包括公众号
-    CHAOS_TYPE = 49
 
 # TODO: 完善代码
 @register_platform_adapter(
@@ -225,9 +200,18 @@ class WeChatWebsocketAdapter(Platform):
         logger.debug(f"收到 WebSocket 消息: {message}")
         try:
             message_data = json.loads(message)
-            if (message_data.get("id") is not None
-                and not (message_data.get("wxid") is None and message_data.get("roomid") is None)
-            ):
+            msg_type = message_data.get("type")
+            if msg_type == WechatWebsocketMessageType.HEART_BEAT.value:
+                logger.debug("收到心跳消息")
+                return
+            if msg_type == WechatWebsocketMessageType.ON_CONNECT_MSG.value:
+                logger.info("websocket 成功连接")
+                return
+            if msg_type != WechatWebsocketMessageType.TXT_MSG.value:
+                logger.warning(f"收到非文字消息：{message}")
+                return
+
+            if message_data.get("id") is not None and message_data.get("wxid") is not None:
                 abm = await self.convert_message(message_data)
                 if abm:
                     message_event = WeChatWebsocketMessageEvent(
@@ -248,7 +232,6 @@ class WeChatWebsocketAdapter(Platform):
             logger.error(f"无法解析 WebSocket 消息为 JSON: {message}")
         except Exception as e:
             logger.error(f"处理 WebSocket 消息时发生错误: {e}")
-        pass
 
     async def convert_message(self, raw_message: dict) -> AstrBotMessage | None:
         """将 WeChat-Websocket 原始消息转换为 AstrBotMessage。"""
