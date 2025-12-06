@@ -207,7 +207,7 @@ class WeChatWebsocketAdapter(Platform):
             if msg_type == WechatWebsocketMessageType.ON_CONNECT_MSG.value:
                 logger.info("websocket 成功连接")
                 return
-            if msg_type != WechatWebsocketMessageType.TXT_MSG.value:
+            if msg_type != WechatWebsocketMessageType.RECV_TXT_MSG.value:
                 logger.warning(f"收到非文字消息：{message}")
                 return
 
