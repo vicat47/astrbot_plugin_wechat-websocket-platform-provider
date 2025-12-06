@@ -447,7 +447,7 @@ class WeChatWebsocketAdapter(Platform):
         title: str | None = title_list[0].text if title_list else None
         content = title
         abm.message_str = content
-        at_list = re.findall(rf"( ?@[^ ]{0,50} ?)", content)
+        at_list = re.findall(r"( ?@[^ ]{0,50} ?)", content)
         at_me = False
         bot_nickname = None
         if len(at_list) > 0:
@@ -463,8 +463,11 @@ class WeChatWebsocketAdapter(Platform):
                 0,
                 At(qq=abm.self_id, name=bot_nickname or abm.self_id)
             )
-        abm.message.append(Plain(content))
-
+            other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
+            if len(other_worlds.strip()) > 1:
+                abm.message.append(Plain(content))
+        else:
+            abm.message.append(Plain(content))
 
 
     async def terminate(self):
