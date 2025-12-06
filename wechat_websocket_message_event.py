@@ -59,7 +59,7 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                 self.message_obj.sender.user_id or self.message_obj.sender.nickname
             )  # 确保发送者有 ID 或昵称
         ):
-            payload["para"]["roomid"] = self.message_obj.group.group_id
+            payload["para"]["wxid"] = self.message_obj.group.group_id
             # mention_text = (
             #         self.message_obj.sender.nickname or self.message_obj.sender.user_id
             # )
