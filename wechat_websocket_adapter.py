@@ -21,7 +21,7 @@ from astrbot.core.platform.message_session import MessageSesion
 from astrbot.core.platform.register import register_platform_adapter
 from astrbot.core.star.context import logger
 
-from .wechat_income_msg import WechatWebsocketMessageType, BaseWechatMessage, TextMessage, WechatIncomeMsgType  # noqa
+from .wechat_income_msg import WechatWebsocketSysMsgType, WechatIncomeMsgType, WechatChaosMsgBaseType  # noqa
 from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
 
 
@@ -207,11 +207,14 @@ class WeChatWebsocketAdapter(Platform):
             if msg_type == WechatIncomeMsgType.ON_CONNECT.value:
                 logger.info("websocket 成功连接")
                 return
-            if msg_type != WechatIncomeMsgType.TXT.value:
-                logger.warning(f"收到非文字消息：{message}")
+            if msg_type == WechatIncomeMsgType.PIC.value:
+                logger.error(f"收到图片消息，暂未实现。{message}")
                 return
-
-            if message_data.get("id") is not None and message_data.get("wxid") is not None:
+            if (msg_type != WechatIncomeMsgType.TXT.value and
+                msg_type != WechatIncomeMsgType.CHAOS.value):
+                logger.error(f"收到非文字消息：{message}")
+                return
+            if message_data.get("id") is not None:
                 abm = await self.convert_message(message_data)
                 if abm:
                     message_event = WeChatWebsocketMessageEvent(
@@ -224,8 +227,6 @@ class WeChatWebsocketAdapter(Platform):
                     )
                     # 提交事件到事件队列
                     self.commit_event(message_event)
-            elif int(message_data.get("type")) == WechatWebsocketMessageType.HEART_BEAT:
-                logger.debug(f"收到心跳消息")
             else:
                 logger.warning(f"收到未知结构的 WebSocket 消息: {message_data}")
         except json.JSONDecodeError:
@@ -247,9 +248,12 @@ class WeChatWebsocketAdapter(Platform):
             )
             return None
 
-
-        from_user_id = raw_message.get("wxid", "")
         content = raw_message.get("content", "")
+        from_group_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id1", ""))
+        from_user_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id2", ""))
+        if from_group_id != "" and "@chatroom" not in from_group_id:
+            from_user_id = from_group_id
+            from_group_id = ""
         msg_type = raw_message.get("type")
 
         abm.message_str = ""
@@ -266,22 +270,22 @@ class WeChatWebsocketAdapter(Platform):
             abm,
             raw_message,
             from_user_id,
-            content,
+            from_group_id,
         ):
             await self._process_message_content(abm, raw_message, msg_type, content)
             return abm
         return None
 
-    async def _process_chat_type(self, abm, raw_message: dict, from_user_id, content):
+    async def _process_chat_type(self, abm, raw_message: dict, from_user_id, from_group_id):
         """判断消息是群聊还是私聊，并设置 AstrBotMessage 的基本属性。"""
         if from_user_id == "weixin":
             return False
-        at_me = False
-        if "@chatroom" in from_user_id:
+        # at_me = False
+        if "@chatroom" in from_group_id:
             abm.type = MessageType.GROUP_MESSAGE
-            abm.group_id = from_user_id
+            abm.group_id = from_group_id
 
-            sender_wxid = raw_message.get("id1")
+            sender_wxid = from_user_id
             abm.sender = MessageMember(user_id=sender_wxid, nickname="")
 
             # 获取群聊发送者的nickname
@@ -295,18 +299,18 @@ class WeChatWebsocketAdapter(Platform):
 
             # 对于群聊，session_id 可以是群聊 ID 或发送者 ID + 群聊 ID (如果 unique_session 为 True)
             if self.unique_session:
-                abm.session_id = f"{from_user_id}#{abm.sender.user_id}"
+                abm.session_id = f"{from_group_id}#{abm.sender.user_id}"
             else:
-                abm.session_id = from_user_id
+                abm.session_id = from_group_id
 
             # todo 处理 xml 内容
-            msg_source = raw_message.get("other")
-            if self.wxid in msg_source:
-                at_me = True
-            if "在群聊中@了你" in raw_message.get("push_content", ""):
-                at_me = True
-            if at_me:
-                abm.message.insert(0, At(qq=abm.self_id, name=""))
+            # msg_source = raw_message.get("other", "")
+            # if self.wxid in msg_source:
+            #     at_me = True
+            # if "在群聊中@了你" in raw_message.get("push_content", ""):
+            #     at_me = True
+            # if at_me:
+            #     abm.message.insert(0, At(qq=abm.self_id, name=""))
         else:
             abm.type = MessageType.FRIEND_MESSAGE
             abm.group_id = ""
@@ -334,25 +338,29 @@ class WeChatWebsocketAdapter(Platform):
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(url, json=payload) as response:
-                    response_data = await response.json()
+                    response_text = await response.text()
+                    response_data = json.loads(response_text)
                     if response.status == 200 and response_data.get("status") == "SUCCSESSED":
-                        content = response_data.get("content")
-                        # todo 处理 content json
+                        content_json = response_data.get("content")
+                        content = json.loads(content_json)
+                        return content.get("nick")
                     else:
                         logger.error(
                             f"获取群成员详情失败: {response.status}, {response_data}",
                         )
                         return None
             except aiohttp.ClientConnectorError as e:
-                logger.error(f"连接到 WeChatPadPro 服务失败: {e}")
+                logger.error(f"连接到 {self.metadata.name} 服务失败: {e}")
                 return None
             except Exception as e:
                 logger.error(f"获取群成员详情时发生错误: {e}")
                 return None
 
-    async def _process_message_content(self, abm, raw_message: dict, msg_type: int, content: str):
+    async def _process_message_content(self, abm: AstrBotMessage, raw_message: dict, msg_type: int, content: str):
         """根据消息类型处理消息内容，填充 AstrBotMessage 的 message 列表。"""
-        if msg_type == 1:
+        if WechatIncomeMsgType.CHAOS.value == msg_type:
+            await self._process_chaos(abm, raw_message)
+        elif WechatIncomeMsgType.TXT.value == msg_type:
             abm.message_str = content
             if abm.type == MessageType.GROUP_MESSAGE:
                 # 检查是否@了机器人，参考 gewechat 的实现方式
@@ -360,11 +368,13 @@ class WeChatWebsocketAdapter(Platform):
                 at_me = False
 
                 # 检查 other 中是否包含机器人的 wxid
-                other_xml = raw_message.get("other", "")
-                xml_data = etree.fromstring(other_xml)
-                at_user_list: List[Element] = xml_data.xpath("/msgsource/atuserlist")
-                # 用户列表通过 , 分割
-                at_user_list: str | None = at_user_list[0].text if at_user_list else None
+                other_xml = raw_message.get("other")
+                at_user_list = None
+                if other_xml:
+                    xml_data = etree.fromstring(other_xml)
+                    at_user_list: List[Element] | None = xml_data.xpath("/msgsource/atuserlist")
+                    # 用户列表通过 , 分割
+                    at_user_list: str | None = at_user_list[0].text if at_user_list else None
 
                 if at_user_list and self.wxid in at_user_list:
                     at_me = True
@@ -379,7 +389,7 @@ class WeChatWebsocketAdapter(Platform):
                         At(qq=abm.self_id, name=bot_nickname or abm.self_id)
                     )
                     # 只有当消息内容不仅仅是@时才添加Plain组件
-                    other_worlds = re.sub(r"@[^ ]{0,50} ", "", content)
+                    other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
                     if len(other_worlds.strip()) > 1:
                         abm.message.append(Plain(content))
                     else:
@@ -398,25 +408,64 @@ class WeChatWebsocketAdapter(Platform):
             else:
                 # 私聊消息
                 abm.message.append(Plain(abm.message_str))
-            try:
-                # 获取msg_id作为缓存的key
-                new_msg_id = raw_message.get("id")
-                if new_msg_id:
-                    # 限制缓存大小
-                    if (
-                            len(self.cached_texts) >= self.max_text_cache
-                            and self.cached_texts
-                    ):
-                        # 删除最早的一条缓存
-                        oldest_key = next(iter(self.cached_texts))
-                        self.cached_texts.pop(oldest_key)
-                logger.debug(f"缓存文本消息，new_msg_id={new_msg_id}")
-                self.cached_texts[str(new_msg_id)] = content
-            except Exception as e:
-                logger.error(f"缓存文本消息失败: {e}")
         # todo 处理其他类型消息
         else:
             logger.warning(f"收到未处理的消息类型: {msg_type}。")
+            return
+        try:
+            # 获取msg_id作为缓存的key
+            new_msg_id = raw_message.get("id")
+            if new_msg_id:
+                # 限制缓存大小
+                if (
+                        len(self.cached_texts) >= self.max_text_cache
+                        and self.cached_texts
+                ):
+                    # 删除最早的一条缓存
+                    oldest_key = next(iter(self.cached_texts))
+                    self.cached_texts.pop(oldest_key)
+            logger.debug(f"缓存文本消息，new_msg_id={new_msg_id}")
+            self.cached_texts[str(new_msg_id)] = content
+        except Exception as e:
+            logger.error(f"缓存文本消息失败: {e}")
+
+    async def _process_chaos(self, abm: AstrBotMessage, raw_message: dict):
+        # todo 处理被引用的消息
+        chaos_xml = raw_message.get("content").get("content")
+        xml_data = etree.fromstring(chaos_xml)
+        xml_type_list = xml_data.xpath("/msg/appmsg/type")
+        xml_type: int | None = int(xml_type_list[0].text) if xml_type_list else None
+        if xml_type is not None and xml_type != WechatChaosMsgBaseType.REF.value:
+            logger.warning(f"不是引用消息，不予处理，{raw_message}")
+            return
+        ref_type_list = xml_data.xpath("/msg/appmsg/refermsg/type")
+        ref_type: int | None = int(ref_type_list[0].text) if ref_type_list else None
+        if ref_type not in [WechatIncomeMsgType.TXT.value, WechatIncomeMsgType.PIC.value]:
+            logger.warning(f"引用除了文字和图片的消息，不予处理，{raw_message}")
+            return
+        title_list = xml_data.xpath("/msg/appmsg/title")
+        title: str | None = title_list[0].text if title_list else None
+        content = title
+        abm.message_str = content
+        at_list = re.findall(rf"( ?@[^ ]{0,50} ?)", content)
+        at_me = False
+        bot_nickname = None
+        if len(at_list) > 0:
+            bot_nickname = await self._get_group_member_nickname(
+                abm.group_id,
+                self.wxid
+            )
+            for at in at_list:
+                if bot_nickname in at and" " in at:
+                    at_me = True
+        if at_me:
+            abm.message.insert(
+                0,
+                At(qq=abm.self_id, name=bot_nickname or abm.self_id)
+            )
+        abm.message.append(Plain(content))
+
+
 
     async def terminate(self):
         """终止一个平台的运行实例。"""

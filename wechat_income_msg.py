@@ -33,6 +33,13 @@ class WechatWebsocketSysMsgType(Enum):
     # 同意微信好友请求消息
     AGREE_TO_FRIEND_REQUEST = 10000
 
+class WechatChaosMsgBaseType(Enum):
+    REF = 57
+
+
+class WechatChaosMsgReferMsgType(Enum):
+    TXT = WechatIncomeMsgType.TXT.value
+    AT = WechatIncomeMsgType.CHAOS.value
 
 @dataclass
 class BaseWechatMessage:
