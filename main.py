@@ -1,8 +1,7 @@
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 
 
-@register("wechat-websocket-platform-provider", "vicat47", "平台提供器插件", "0.1.1")
-class MyPlugin(Star):
+class WechatWebsocketPlatformProvider(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.config = context
