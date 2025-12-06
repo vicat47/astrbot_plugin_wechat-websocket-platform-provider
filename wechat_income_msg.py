@@ -4,17 +4,24 @@ from enum import Enum
 from typing import Optional
 
 
-class WechatWebsocketMessageType(Enum):
+class WechatIncomeMsgType(Enum):
+    TXT = 1
+    PIC = 3
+    ON_CONNECT = 5
     HEART_BEAT = 5005
-    RECV_TXT_MSG = 1
-    RECV_PIC_MSG = 3
-    ON_CONNECT_MSG = 5
+    # 啥都有，包括公众号
+    CHAOS = 49
+
+class WechatSendMsgType(Enum):
+    TXT = 555
+    PIC = 500
+    AT = 550
+    ATTACH_FILE = 5003
+
+class WechatWebsocketSysMsgType(Enum):
     USER_LIST = 5000
     GET_USER_LIST_SUCCESS = 5001
     GET_USER_LIST_FAIL = 5002
-    TXT_MSG = 555
-    PIC_MSG = 500
-    AT_MSG = 550
     CHATROOM_MEMBER = 5010
     CHATROOM_MEMBER_NICK = 5020
     PERSONAL_INFO = 6500
@@ -25,9 +32,7 @@ class WechatWebsocketMessageType(Enum):
     NEW_FRIEND_REQUEST = 37
     # 同意微信好友请求消息
     AGREE_TO_FRIEND_REQUEST = 10000
-    ATTACH_FILE = 5003
-    # 啥都有，包括公众号
-    CHAOS_TYPE = 49
+
 
 @dataclass
 class BaseWechatMessage:
@@ -35,13 +40,13 @@ class BaseWechatMessage:
     id: str
     srvid: int
     time: str
-    type: WechatWebsocketMessageType = field(init=False)  # 不由__init__初始化
+    type: WechatIncomeMsgType = field(init=False)  # 不由__init__初始化
     _type_value: int = field(default=None, repr=False)  # 存储原始类型值
 
     def __post_init__(self):
         """初始化后处理类型转换"""
         if self._type_value is not None:
-            self.type = WechatWebsocketMessageType(self._type_value)
+            self.type = WechatIncomeMsgType(self._type_value)
 
     def __init_subclass__(cls, **kwargs):
         """自动注册子类到消息类型映射表"""
@@ -58,11 +63,11 @@ class BaseWechatMessage:
         # message_class = cls._message_registry.get(type_value, None)
         # if message_class is None:
         #     return None
-        if type_value == WechatWebsocketMessageType.ON_CONNECT_MSG.value:
+        if type_value == WechatIncomeMsgType.ON_CONNECT.value:
             message_class = OnConnectMessage
-        elif type_value == WechatWebsocketMessageType.HEART_BEAT.value:
+        elif type_value == WechatIncomeMsgType.HEART_BEAT.value:
             message_class = HeartBeatMessage
-        elif type_value == WechatWebsocketMessageType.RECV_TXT_MSG.value:
+        elif type_value == WechatIncomeMsgType.TXT.value:
             message_class = TextMessage
         else:
             message_class = UnknownMessage
@@ -85,17 +90,17 @@ class SystemMessage(BaseWechatMessage):
 @dataclass
 class HeartBeatMessage(SystemMessage):
     """心跳消息"""
-    MESSAGE_TYPE = WechatWebsocketMessageType.HEART_BEAT
+    MESSAGE_TYPE = WechatIncomeMsgType.HEART_BEAT
 
 @dataclass
 class OnConnectMessage(SystemMessage):
     """建立连接消息"""
-    MESSAGE_TYPE = WechatWebsocketMessageType.ON_CONNECT_MSG
+    MESSAGE_TYPE = WechatIncomeMsgType.ON_CONNECT
 
 @dataclass
 class TextMessage(BaseWechatMessage):
     """文本消息"""
-    MESSAGE_TYPE = WechatWebsocketMessageType.TXT_MSG
+    MESSAGE_TYPE = WechatIncomeMsgType.TXT
 
     id1: Optional[str] = None
     id2: Optional[str] = None
@@ -127,7 +132,7 @@ class ReferenceMessageContent:
 @dataclass
 class ReferenceSingleLineMessage(SystemMessage):
     """引用消息"""
-    MESSAGE_TYPE = WechatWebsocketMessageType.CHAOS_TYPE
+    MESSAGE_TYPE = WechatIncomeMsgType.CHAOS
 
     # content字段的特殊处理
     _content_str: str = field(default="", repr=False)

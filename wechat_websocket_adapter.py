@@ -21,7 +21,7 @@ from astrbot.core.platform.message_session import MessageSesion
 from astrbot.core.platform.register import register_platform_adapter
 from astrbot.core.star.context import logger
 
-from .wechat_income_msg import WechatWebsocketMessageType, BaseWechatMessage, TextMessage  # noqa
+from .wechat_income_msg import WechatWebsocketMessageType, BaseWechatMessage, TextMessage, WechatIncomeMsgType  # noqa
 from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
 
 
@@ -201,13 +201,13 @@ class WeChatWebsocketAdapter(Platform):
         try:
             message_data = json.loads(message)
             msg_type = message_data.get("type")
-            if msg_type == WechatWebsocketMessageType.HEART_BEAT.value:
+            if msg_type == WechatIncomeMsgType.HEART_BEAT.value:
                 logger.debug("收到心跳消息")
                 return
-            if msg_type == WechatWebsocketMessageType.ON_CONNECT_MSG.value:
+            if msg_type == WechatIncomeMsgType.ON_CONNECT.value:
                 logger.info("websocket 成功连接")
                 return
-            if msg_type != WechatWebsocketMessageType.RECV_TXT_MSG.value:
+            if msg_type != WechatIncomeMsgType.TXT.value:
                 logger.warning(f"收到非文字消息：{message}")
                 return
 
