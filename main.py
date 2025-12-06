@@ -1,7 +1,7 @@
 from astrbot.api.star import Context, Star, register
 
 
-@register("wechat-websocket-platform-provider", "vicat47", "平台提供器插件", "0.1.0")
+@register("wechat-websocket-platform-provider", "vicat47", "平台提供器插件", "0.1.1")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -9,7 +9,7 @@ class MyPlugin(Star):
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-        from .wechat_websocket_adapter import WeChatWebsocketAdapter
+        from .wechat_websocket_adapter import WeChatWebsocketAdapter # noqa
 
 
     # # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
