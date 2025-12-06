@@ -50,27 +50,27 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
         }
         if (
             self.message_obj.type == MessageType.GROUP_MESSAGE  # 确保是群聊消息
-            and self.adapter.settings.get(
-                "reply_with_mention",
-                False,
-            )  # 检查适配器设置是否启用 reply_with_mention
+            # and self.adapter.settings.get(
+            #     "reply_with_mention",
+            #     False,
+            # )  # todo 检查适配器设置是否启用 reply_with_mention
             and self.message_obj.sender  # 确保有发送者信息
             and (
                 self.message_obj.sender.user_id or self.message_obj.sender.nickname
             )  # 确保发送者有 ID 或昵称
         ):
             payload["para"]["roomid"] = self.message_obj.group.group_id
-            mention_text = (
-                    self.message_obj.sender.nickname or self.message_obj.sender.user_id
-            )
-            message_text = f"@{mention_text} {text}"
+            # mention_text = (
+            #         self.message_obj.sender.nickname or self.message_obj.sender.user_id
+            # )
+            # message_text = f"@{mention_text} {text}"
         else:
             payload["para"]["wxid"] = self.message_obj.sender.user_id
-            message_text = text
-        if self.get_group_id() and "#" in self.session_id:
-            session_id = self.session_id.split("#")[0]
-        else:
-            session_id = self.session_id
+            # message_text = text
+        # if self.get_group_id() and "#" in self.session_id:
+        #     session_id = self.session_id.split("#")[0]
+        # else:
+        #     session_id = self.session_id
         url = f"{self.adapter.base_url}/api/sendtxtmsg"
         await self._post(session, url, payload)
 

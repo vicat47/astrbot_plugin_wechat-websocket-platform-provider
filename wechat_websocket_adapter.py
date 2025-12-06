@@ -248,13 +248,17 @@ class WeChatWebsocketAdapter(Platform):
             )
             return None
 
+        msg_type = raw_message.get("type")
         content = raw_message.get("content", "")
         from_group_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id1", ""))
         from_user_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id2", ""))
-        if from_group_id != "" and "@chatroom" not in from_group_id:
+        if msg_type ==  WechatIncomeMsgType.CHAOS.value and from_group_id != "" and "@chatroom" not in from_group_id:
+            # 处理引用消息
             from_user_id = from_group_id
             from_group_id = ""
-        msg_type = raw_message.get("type")
+
+        if msg_type != WechatIncomeMsgType.CHAOS.value and raw_message.get("id1") != "":
+            from_user_id = raw_message.get("id1")
 
         abm.message_str = ""
         abm.message = []
@@ -268,7 +272,6 @@ class WeChatWebsocketAdapter(Platform):
             return None
         if await self._process_chat_type(
             abm,
-            raw_message,
             from_user_id,
             from_group_id,
         ):
@@ -276,7 +279,7 @@ class WeChatWebsocketAdapter(Platform):
             return abm
         return None
 
-    async def _process_chat_type(self, abm, raw_message: dict, from_user_id, from_group_id):
+    async def _process_chat_type(self, abm, from_user_id, from_group_id):
         """判断消息是群聊还是私聊，并设置 AstrBotMessage 的基本属性。"""
         if from_user_id == "weixin":
             return False
@@ -285,14 +288,13 @@ class WeChatWebsocketAdapter(Platform):
             abm.type = MessageType.GROUP_MESSAGE
             abm.group_id = from_group_id
 
-            sender_wxid = from_user_id
-            abm.sender = MessageMember(user_id=sender_wxid, nickname="")
+            abm.sender = MessageMember(user_id=from_user_id, nickname="")
 
             # 获取群聊发送者的nickname
-            if sender_wxid:
+            if from_user_id:
                 accurate_nickname = await self._get_group_member_nickname(
                     abm.group_id,
-                    sender_wxid,
+                    abm.sender.user_id,
                 )
                 if accurate_nickname:
                     abm.sender.nickname = accurate_nickname
@@ -448,27 +450,27 @@ class WeChatWebsocketAdapter(Platform):
         title: str | None = title_list[0].text if title_list else None
         content = title
         abm.message_str = content
-        at_list = re.findall(r"( ?@[^ ]{0,50} ?)", content)
-        at_me = False
-        bot_nickname = None
-        if len(at_list) > 0:
-            bot_nickname = await self._get_group_member_nickname(
-                abm.group_id,
-                self.wxid
-            )
-            for at in at_list:
-                if bot_nickname in at and" " in at:
-                    at_me = True
-        if at_me:
-            abm.message.insert(
-                0,
-                At(qq=abm.self_id, name=bot_nickname or abm.self_id)
-            )
-            other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
-            if len(other_worlds.strip()) > 1:
-                abm.message.append(Plain(content))
-        else:
-            abm.message.append(Plain(content))
+        if abm.type == MessageType.GROUP_MESSAGE:
+            at_list = re.findall(r"( ?@[^ ]{0,50} ?)", content)
+            at_me = False
+            bot_nickname = None
+            if len(at_list) > 0:
+                bot_nickname = await self._get_group_member_nickname(
+                    abm.group_id,
+                    self.wxid
+                )
+                for at in at_list:
+                    if bot_nickname in at and" " in at:
+                        at_me = True
+            if at_me:
+                abm.message.insert(
+                    0,
+                    At(qq=abm.self_id, name=bot_nickname or abm.self_id)
+                )
+                other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
+                if len(other_worlds.strip()) > 1:
+                    abm.message.append(Plain(content))
+        abm.message.append(Plain(content))
 
 
     async def terminate(self):
