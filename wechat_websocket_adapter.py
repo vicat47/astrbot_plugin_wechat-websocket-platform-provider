@@ -45,9 +45,8 @@ class WeChatWebsocketAdapter(Platform):
         platform_settings: dict,
         event_queue: Queue
     ) -> None:
-        super().__init__(event_queue)
+        super().__init__(platform_config, event_queue)
         self._shutdown_event = None
-        self.config = platform_config
         self.settings = platform_settings
 
         self.unique_session = platform_settings["unique_session"]
@@ -55,17 +54,17 @@ class WeChatWebsocketAdapter(Platform):
         self.metadata = PlatformMetadata(
             name="wechat-websocket",
             description="微信机器人个人适配",
-            id=self.config.get("id", "wechat-websocket"),
+            id=platform_config.get("id", "wechat-websocket"),
             support_streaming_message=False,
         )
 
-        self.host = self.config.get("host")
-        self.port = self.config.get("port")
-        self.active_message_poll: bool = self.config.get(
+        self.host = platform_config.get("host")
+        self.port = platform_config.get("port")
+        self.active_message_poll: bool = platform_config.get(
             "ww_active_message_poll",
             False,
         )
-        self.active_message_poll_interval: int = self.config.get(
+        self.active_message_poll_interval: int = platform_config.get(
             "ww_active_message_poll_interval",
             5,
         )
