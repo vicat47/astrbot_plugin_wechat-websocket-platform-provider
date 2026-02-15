@@ -1,11 +1,14 @@
 import asyncio
+import base64
+import io
 import json
 from datetime import datetime
 from typing import AsyncGenerator, TYPE_CHECKING
 
 import aiohttp
+from PIL import Image as PILImage  # 使用别名避免冲突
 
-from astrbot.core.message.components import Plain
+from astrbot.core.message.components import Plain, Image
 from astrbot.core.message.message_event_result import MessageChain
 from astrbot.core.platform import AstrMessageEvent, AstrBotMessage, PlatformMetadata, MessageType
 from astrbot.core.star.context import logger
@@ -34,6 +37,8 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                 await asyncio.sleep(1)
                 if isinstance(comp, Plain):
                     await self._send_text(session, comp.text)
+                elif isinstance(comp, Image):
+                    await self._send_image(session, comp)
         await super().send(message)
 
     async def _send_text(self, session: aiohttp.ClientSession, text: str):
@@ -83,3 +88,33 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                     logger.error(f"{url} failed: {resp.status} {data}")
         except Exception as e:
             logger.error(f"{url} error: {e}")
+
+    async def _send_image(self, session: aiohttp.ClientSession, comp: Image):
+        b64 = await comp.convert_to_base64()
+        raw = self._validate_base64(b64)
+        b64c = self._compress_image(raw)
+        payload = {
+            "data_type": "base64",
+            "data": b64c,
+            "image_type": "jpg",
+            "target": self.session_id
+        }
+        url = f"{self.adapter.image_service_url}/images/send"
+        await self._post(session, url, payload)
+
+    @staticmethod
+    def _validate_base64(b64: str) -> bytes:
+        return base64.b64decode(b64, validate=True)
+
+    @staticmethod
+    def _compress_image(data: bytes) -> str:
+        img = PILImage.open(io.BytesIO(data))
+        buf = io.BytesIO()
+        if img.format == "JPEG":
+            img.save(buf, "JPEG", quality=80)
+        else:
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.save(buf, "JPEG", quality=80)
+        # logger.info("图片处理完成！！！")
+        return base64.b64encode(buf.getvalue()).decode()

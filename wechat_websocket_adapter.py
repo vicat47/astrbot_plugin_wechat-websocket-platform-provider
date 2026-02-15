@@ -33,6 +33,7 @@ from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
     default_config_tmpl={
         "host": "目标IP",
         "port": "5555",
+        "image_service_port": "8080"
     },
     logo_path="assets/wechat-6a207b66.png",
     support_streaming_message=False,
@@ -60,6 +61,7 @@ class WeChatWebsocketAdapter(Platform):
 
         self.host = platform_config.get("host")
         self.port = platform_config.get("port")
+        self.image_service_port = self.config.get("image_service_port")
         self.active_message_poll: bool = platform_config.get(
             "ww_active_message_poll",
             False,
@@ -69,6 +71,7 @@ class WeChatWebsocketAdapter(Platform):
             5,
         )
         self.base_url = f"http://{self.host}:{self.port}"
+        self.image_service_url = f"http://{self.host}:{self.image_service_port}"
         self.wxid = None
         self.nickname = None
         self.head_pic = None
