@@ -26,6 +26,7 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                  adapter: "WeChatWebsocketAdapter", ):
         super().__init__(message_str, message_obj, platform_meta, session_id)
         self.message_obj = message_obj  # Save the full message object
+        self.message_type = message_obj.type
         self.adapter = adapter
 
     async def send_streaming(self, generator: AsyncGenerator[MessageChain, None], use_fallback: bool = False):
