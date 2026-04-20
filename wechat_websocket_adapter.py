@@ -15,14 +15,24 @@ from lxml import etree
 
 from astrbot.core.message.components import At, Plain
 from astrbot.core.message.message_event_result import MessageChain
-from astrbot.core.platform import PlatformMetadata, AstrBotMessage, MessageType, MessageMember, AstrMessageEvent, \
-    Platform
+from astrbot.core.platform import (
+    PlatformMetadata,
+    AstrBotMessage,
+    MessageType,
+    MessageMember,
+    AstrMessageEvent,
+    Platform,
+)
 from astrbot.core.platform.message_session import MessageSesion
 from astrbot.core.platform.register import register_platform_adapter
 from astrbot.core.star.context import logger
 
-from .wechat_income_msg import WechatWebsocketSysMsgType, WechatIncomeMsgType, WechatChaosMsgBaseType  # noqa
-from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
+from .wechat_income_msg import (
+    WechatWebsocketSysMsgType,
+    WechatIncomeMsgType,
+    WechatChaosMsgBaseType,
+)  # noqa
+from .wechat_websocket_message_event import WeChatWebsocketMessageEvent  # noqa
 
 
 # TODO: 完善代码
@@ -33,18 +43,14 @@ from .wechat_websocket_message_event import WeChatWebsocketMessageEvent # noqa
     default_config_tmpl={
         "host": "目标IP",
         "port": "5555",
-        "image_service_port": "8080"
+        "image_service_port": "8080",
     },
     logo_path="assets/wechat-6a207b66.png",
     support_streaming_message=False,
 )
 class WeChatWebsocketAdapter(Platform):
-
     def __init__(
-        self,
-        platform_config: dict,
-        platform_settings: dict,
-        event_queue: Queue
+        self, platform_config: dict, platform_settings: dict, event_queue: Queue
     ) -> None:
         super().__init__(platform_config, event_queue)
         self._shutdown_event = None
@@ -88,7 +94,7 @@ class WeChatWebsocketAdapter(Platform):
         logger.info(f"{self.metadata.name} 适配器正在启动...")
 
         isLoginIn = await self.check_online_status()
-        if (isLoginIn):
+        if isLoginIn:
             self.ws_handle_task = asyncio.create_task(self.connect_websocket())
         self._shutdown_event = asyncio.Event()
         await self._shutdown_event.wait()
@@ -98,12 +104,12 @@ class WeChatWebsocketAdapter(Platform):
         return PlatformMetadata(
             name="wechat_websocket",
             description="微信机器人个人适配",
-            id=self.config.get("id")
+            id=self.config.get("id"),
         )
 
-    async def send_by_session(self,
-                              session: MessageSesion,
-                              message_chain: MessageChain):
+    async def send_by_session(
+        self, session: MessageSesion, message_chain: MessageChain
+    ):
         dummy_message_obj = AstrBotMessage()
         dummy_message_obj.session_id = session.session_id
         # 根据 session_id 判断消息类型
@@ -131,7 +137,7 @@ class WeChatWebsocketAdapter(Platform):
         super().commit_event(event)
 
     def get_client(self):
-        super().get_client()
+        return self
 
     async def check_online_status(self):
         url = f"{self.base_url}/api/get_personal_info"
@@ -143,7 +149,7 @@ class WeChatWebsocketAdapter(Platform):
                 "wxid": "",
                 "content": "",
                 "nickname": "",
-                "ext": ""
+                "ext": "",
             }
         }
         async with aiohttp.ClientSession() as session:
@@ -151,7 +157,10 @@ class WeChatWebsocketAdapter(Platform):
                 async with session.get(url, json=data) as response:
                     response_data = await response.text()
                     response_data = json.loads(response_data)
-                    if response.status == 200 and response_data.get("status") == "SUCCSESSED":
+                    if (
+                        response.status == 200
+                        and response_data.get("status") == "SUCCSESSED"
+                    ):
                         person_info = json.loads(response_data.get("content"))
                         self.wxid = person_info.get("wx_id")
                         self.nickname = person_info.get("wx_name")
@@ -212,8 +221,10 @@ class WeChatWebsocketAdapter(Platform):
             if msg_type == WechatIncomeMsgType.PIC.value:
                 logger.error(f"收到图片消息，暂未实现。{message}")
                 return
-            if (msg_type != WechatIncomeMsgType.TXT.value and
-                msg_type != WechatIncomeMsgType.CHAOS.value):
+            if (
+                msg_type != WechatIncomeMsgType.TXT.value
+                and msg_type != WechatIncomeMsgType.CHAOS.value
+            ):
                 logger.error(f"收到非文字消息：{message}")
                 return
             if message_data.get("id") is not None:
@@ -241,7 +252,9 @@ class WeChatWebsocketAdapter(Platform):
         abm = AstrBotMessage()
         abm.raw_message = raw_message
         abm.message_id = str(raw_message.get("id"))
-        abm.timestamp = int(time.mktime(time.strptime(raw_message.get("time"), "%Y-%m-%d %H:%M:%S")))
+        abm.timestamp = int(
+            time.mktime(time.strptime(raw_message.get("time"), "%Y-%m-%d %H:%M:%S"))
+        )
         abm.self_id = self.wxid
 
         if int(time.time()) - abm.timestamp > 180:
@@ -252,9 +265,17 @@ class WeChatWebsocketAdapter(Platform):
 
         msg_type = raw_message.get("type")
         content = raw_message.get("content", "")
-        from_group_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id1", ""))
-        from_user_id = raw_message.get("wxid", "" if isinstance(content, str) else content.get("id2", ""))
-        if msg_type ==  WechatIncomeMsgType.CHAOS.value and from_group_id != "" and "@chatroom" not in from_group_id:
+        from_group_id = raw_message.get(
+            "wxid", "" if isinstance(content, str) else content.get("id1", "")
+        )
+        from_user_id = raw_message.get(
+            "wxid", "" if isinstance(content, str) else content.get("id2", "")
+        )
+        if (
+            msg_type == WechatIncomeMsgType.CHAOS.value
+            and from_group_id != ""
+            and "@chatroom" not in from_group_id
+        ):
             # 处理引用消息
             from_user_id = from_group_id
             from_group_id = ""
@@ -336,7 +357,7 @@ class WeChatWebsocketAdapter(Platform):
                 "wxid": f"{sender_wxid}",
                 "content": "null",
                 "nickname": "null",
-                "ext": "null"
+                "ext": "null",
             }
         }
         async with aiohttp.ClientSession() as session:
@@ -344,7 +365,10 @@ class WeChatWebsocketAdapter(Platform):
                 async with session.post(url, json=payload) as response:
                     response_text = await response.text()
                     response_data = json.loads(response_text)
-                    if response.status == 200 and response_data.get("status") == "SUCCSESSED":
+                    if (
+                        response.status == 200
+                        and response_data.get("status") == "SUCCSESSED"
+                    ):
                         content_json = response_data.get("content")
                         content = json.loads(content_json)
                         return content.get("nick")
@@ -360,7 +384,9 @@ class WeChatWebsocketAdapter(Platform):
                 logger.error(f"获取群成员详情时发生错误: {e}")
                 return None
 
-    async def _process_message_content(self, abm: AstrBotMessage, raw_message: dict, msg_type: int, content: str):
+    async def _process_message_content(
+        self, abm: AstrBotMessage, raw_message: dict, msg_type: int, content: str
+    ):
         """根据消息类型处理消息内容，填充 AstrBotMessage 的 message 列表。"""
         if WechatIncomeMsgType.CHAOS.value == msg_type:
             await self._process_chaos(abm, raw_message)
@@ -376,21 +402,23 @@ class WeChatWebsocketAdapter(Platform):
                 at_user_list = None
                 if other_xml:
                     xml_data = etree.fromstring(other_xml)
-                    at_user_list: List[Element] | None = xml_data.xpath("/msgsource/atuserlist")
+                    at_user_list: List[Element] | None = xml_data.xpath(
+                        "/msgsource/atuserlist"
+                    )
                     # 用户列表通过 , 分割
-                    at_user_list: str | None = at_user_list[0].text if at_user_list else None
+                    at_user_list: str | None = (
+                        at_user_list[0].text if at_user_list else None
+                    )
 
                 if at_user_list and self.wxid in at_user_list:
                     at_me = True
                 if at_me:
                     # 被@了，在消息开头插入At组件
                     bot_nickname = await self._get_group_member_nickname(
-                        abm.group_id,
-                        self.wxid
+                        abm.group_id, self.wxid
                     )
                     abm.message.insert(
-                        0,
-                        At(qq=abm.self_id, name=bot_nickname or abm.self_id)
+                        0, At(qq=abm.self_id, name=bot_nickname or abm.self_id)
                     )
                     # 只有当消息内容不仅仅是@时才添加Plain组件
                     other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
@@ -399,10 +427,7 @@ class WeChatWebsocketAdapter(Platform):
                     else:
                         # 检查是否只包含@机器人
                         is_pure_at = False
-                        if (
-                                bot_nickname
-                                and content.strip() == f"@{bot_nickname}"
-                        ):
+                        if bot_nickname and content.strip() == f"@{bot_nickname}":
                             is_pure_at = True
                         if not is_pure_at:
                             abm.message.append(Plain(content))
@@ -421,10 +446,7 @@ class WeChatWebsocketAdapter(Platform):
             new_msg_id = raw_message.get("id")
             if new_msg_id:
                 # 限制缓存大小
-                if (
-                        len(self.cached_texts) >= self.max_text_cache
-                        and self.cached_texts
-                ):
+                if len(self.cached_texts) >= self.max_text_cache and self.cached_texts:
                     # 删除最早的一条缓存
                     oldest_key = next(iter(self.cached_texts))
                     self.cached_texts.pop(oldest_key)
@@ -445,7 +467,10 @@ class WeChatWebsocketAdapter(Platform):
             return
         ref_type_list = xml_data.xpath("/msg/appmsg/refermsg/type")
         ref_type: int | None = int(ref_type_list[0].text) if ref_type_list else None
-        if ref_type not in [WechatIncomeMsgType.TXT.value, WechatIncomeMsgType.PIC.value]:
+        if ref_type not in [
+            WechatIncomeMsgType.TXT.value,
+            WechatIncomeMsgType.PIC.value,
+        ]:
             logger.warning(f"引用除了文字和图片的消息，不予处理，{raw_message}")
             return
         title_list = xml_data.xpath("/msg/appmsg/title")
@@ -458,22 +483,19 @@ class WeChatWebsocketAdapter(Platform):
             bot_nickname = None
             if len(at_list) > 0:
                 bot_nickname = await self._get_group_member_nickname(
-                    abm.group_id,
-                    self.wxid
+                    abm.group_id, self.wxid
                 )
                 for at in at_list:
-                    if bot_nickname in at and" " in at:
+                    if bot_nickname in at and " " in at:
                         at_me = True
             if at_me:
                 abm.message.insert(
-                    0,
-                    At(qq=abm.self_id, name=bot_nickname or abm.self_id)
+                    0, At(qq=abm.self_id, name=bot_nickname or abm.self_id)
                 )
                 other_worlds = re.sub(r" ?@[^ ]{0,50} ?", "", content)
                 if len(other_worlds.strip()) > 1:
                     abm.message.append(Plain(content))
         abm.message.append(Plain(content))
-
 
     async def terminate(self):
         """终止一个平台的运行实例。"""
@@ -492,9 +514,9 @@ class WeChatWebsocketAdapter(Platform):
         return None
 
     async def get_contact_details_list(
-            self,
-            room_wx_id_list: list[str] = None,
-            user_names: list[str] = None,
+        self,
+        room_wx_id_list: list[str] = None,
+        user_names: list[str] = None,
     ) -> dict | None:
         """获取联系人详情列表。"""
         # TODO
