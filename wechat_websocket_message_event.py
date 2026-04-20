@@ -10,26 +10,36 @@ from PIL import Image as PILImage  # 使用别名避免冲突
 
 from astrbot.core.message.components import Plain, Image
 from astrbot.core.message.message_event_result import MessageChain
-from astrbot.core.platform import AstrMessageEvent, AstrBotMessage, PlatformMetadata, MessageType
+from astrbot.core.platform import (
+    AstrMessageEvent,
+    AstrBotMessage,
+    PlatformMetadata,
+    MessageType,
+)
 from astrbot.core.star.context import logger
 
 if TYPE_CHECKING:
     from wechat_websocket_adapter import WeChatWebsocketAdapter
 
+
 # TODO: 完善代码
 class WeChatWebsocketMessageEvent(AstrMessageEvent):
-    def __init__(self,
-                 message_str: str,
-                 message_obj: AstrBotMessage,
-                 platform_meta: PlatformMetadata,
-                 session_id: str,
-                 adapter: "WeChatWebsocketAdapter", ):
+    def __init__(
+        self,
+        message_str: str,
+        message_obj: AstrBotMessage,
+        platform_meta: PlatformMetadata,
+        session_id: str,
+        adapter: "WeChatWebsocketAdapter",
+    ):
         super().__init__(message_str, message_obj, platform_meta, session_id)
-        self.message_obj = message_obj  # Save the full message object
         self.message_type = message_obj.type
         self.adapter = adapter
+        self.bot = adapter.get_client()  # 兼容其他插件期望的 event.bot 属性
 
-    async def send_streaming(self, generator: AsyncGenerator[MessageChain, None], use_fallback: bool = False):
+    async def send_streaming(
+        self, generator: AsyncGenerator[MessageChain, None], use_fallback: bool = False
+    ):
         return await super().send_streaming(generator, use_fallback)
 
     async def send(self, message: MessageChain):
@@ -51,7 +61,7 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
                 "wxid": "null",
                 "content": f"{text}",
                 "nickname": "null",
-                "ext": "null"
+                "ext": "null",
             }
         }
         if (
@@ -98,7 +108,7 @@ class WeChatWebsocketMessageEvent(AstrMessageEvent):
             "data_type": "base64",
             "data": b64c,
             "image_type": "jpg",
-            "target": self.session_id
+            "target": self.session_id,
         }
         url = f"{self.adapter.image_service_url}/images/send"
         await self._post(session, url, payload)
